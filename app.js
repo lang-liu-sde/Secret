@@ -5,7 +5,9 @@ const ejs = require("ejs");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
 // const encrypt = require("mongoose-encryption");
-const md5 = require("md5");
+// const md5 = require("md5");
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 
 const app = express();
@@ -54,34 +56,45 @@ app.get("/register", function(req, res) {
 
 // only if user signed register page, input his email & password, will render secrets page
 app.post("/register", function(req, res) {
-  const newUser = new User({
-    email: req.body.username,
-    password: md5(req.body.password)
+  // using bcrypt
+  bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+
+    const newUser = new User({
+      email: req.body.username,
+      password: hash
+    });
+    // when call save, a. store to mongodb; b. encrypt password
+    newUser.save(function(err) {
+      if (err) {
+        console.log(err);
+      } else {
+        res.render("secrets");
+      }
+    });
   });
-  // when call save, a. store to mongodb; b. encrypt password
-  newUser.save(function(err) {
-    if (err) {
-      console.log(err);
-    } else {
-      res.render("secrets");
-    }
-  });
+  //
+
 });
 
 // validate if the database has such a user
 app.post("/login", function(req, res) {
   const username = req.body.username;
-  const password = md5(req.body.password);
+  const password = req.body.password;
   // decrypt password when call find
   User.findOne({email: username}, function(err, foundUser) {
     if (err) {
       console.log(err);
     } else {
       if (foundUser) {
-        if (foundUser.password === password) {
-          console.log(foundUser.password);
-          res.render("secrets");
-        }
+        // using bcrypt
+        bcrypt.compare(password, foundUser.password, function(err, result) {
+          if (result === true) {
+            res.render("secrets");
+          } else {
+            console.log(err);
+          }
+        });
+          // console.log(foundUser.password);
       }
     }
   });
